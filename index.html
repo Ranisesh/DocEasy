@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Rani Doc Easy</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+    }
+    h2 { text-align: center; }
+    label { font-weight: bold; margin-top: 10px; display: block; }
+    input, select {
+      width: 100%;
+      padding: 6px;
+      margin: 4px 0 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+    th { background: #eee; }
+    .total {
+      text-align: right;
+      font-weight: bold;
+    }
+    .btn {
+      padding: 10px 15px;
+      margin: 5px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Rani Doc Easy</h2>
+
+    <label for="customerSelect">Select Customer:</label>
+    <select id="customerSelect" onchange="fillCustomerDetails()">
+      <option value="">-- Select --</option>
+    </select>
+
+    <label>Name:</label>
+    <input type="text" id="customerName">
+    <label>Phone:</label>
+    <input type="text" id="customerPhone">
+    <label>Email:</label>
+    <input type="text" id="customerEmail">
+    <label>Date:</label>
+    <input type="date" id="invoiceDate">
+
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th><th>Qty</th><th>Rate</th><th>Total</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="invoiceBody"></tbody>
+    </table>
+    <button class="btn" onclick="addItem()">+ Add Item</button>
+
+    <p class="total">Grand Total: ₹<span id="grandTotal">0.00</span></p>
+
+    <div style="text-align:center">
+      <button class="btn" onclick="saveInvoice()">💾 Save</button>
+      <button class="btn" onclick="loadInvoice()">📂 Load</button>
+      <button class="btn" onclick="newInvoice()">🆕 New</button>
+    </div>
+  </div>
+
+  <script>
+    let customers = [];
+    let products = [];
+
+    async function loadJSONFiles() {
+      const customerRes = await fetch('customers.json');
+      customers = await customerRes.json();
+      const customerSelect = document.getElementById('customerSelect');
+      customers.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        customerSelect.appendChild(opt);
+      });
+
+      const productRes = await fetch('products.json');
+      products = await productRes.json();
+    }
+
+    function fillCustomerDetails() {
+      const selected = document.getElementById('customerSelect').value;
+      const cust = customers.find(c => c.id == selected);
+      if (cust) {
+        document.getElementById('customerName').value = cust.name;
+        document.getElementById('customerPhone').value = cust.phone;
+        document.getElementById('customerEmail').value = cust.email;
+      }
+    }
+
+    function addItem(item = {}) {
+      const tbody = document.getElementById('invoiceBody');
+      const row = document.createElement('tr');
+
+      row.innerHTML = `
+        <td>
+          <select class="productSelect" onchange="fillRate(this)">
+            <option value="">-- Select --</option>
+            ${products.map(p => `<option value="${p.id}" ${item.id==p.id?'selected':''}>${p.name}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" value="${item.qty||1}" min="1" class="qty" onchange="updateTotals()"></td>
+        <td><input type="number" value="${item.price||0}" min="0" class="rate" onchange="updateTotals()"></td>
+        <td class="totalCell">0.00</td>
+        <td><button onclick="this.parentElement.parentElement.remove(); updateTotals()">❌</button></td>
+      `;
+      tbody.appendChild(row);
+      updateTotals();
+    }
+
+    function fillRate(select) {
+      const selectedId = select.value;
+      const prod = products.find(p => p.id == selectedId);
+      if (prod) {
+        const row = select.closest('tr');
+        row.querySelector('.rate').value = prod.price;
+      }
+      updateTotals();
+    }
+
+    function updateTotals() {
+      let total = 0;
+      document.querySelectorAll('#invoiceBody tr').forEach(row => {
+        const qty = parseFloat(row.querySelector('.qty').value) || 0;
+        const rate = parseFloat(row.querySelector('.rate').value) || 0;
+        const subtotal = qty * rate;
+        row.querySelector('.totalCell').textContent = subtotal.toFixed(2);
+        total += subtotal;
+      });
+      document.getElementById('grandTotal').textContent = total.toFixed(2);
+    }
+
+    function saveInvoice() {
+      const data = {
+        customer: {
+          name: document.getElementById('customerName').value,
+          phone: document.getElementById('customerPhone').value,
+          email: document.getElementById('customerEmail').value
+        },
+        date: document.getElementById('invoiceDate').value,
+        items: []
+      };
+
+      document.querySelectorAll('#invoiceBody tr').forEach(row => {
+        const select = row.querySelector('.productSelect');
+        const qty = row.querySelector('.qty').value;
+        const rate = row.querySelector('.rate').value;
+        if (select.value) {
+          const product = products.find(p => p.id == select.value);
+          data.items.push({
+            id: product.id,
+            name: product.name,
+            qty: parseInt(qty),
+            price: parseFloat(rate)
+          });
+        }
+      });
+
+      localStorage.setItem('rani_invoice', JSON.stringify(data));
+      alert('Invoice saved!');
+    }
+
+    function loadInvoice() {
+      const data = JSON.parse(localStorage.getItem('rani_invoice'));
+      if (!data) return alert('No saved invoice.');
+
+      document.getElementById('customerName').value = data.customer.name;
+      document.getElementById('customerPhone').value = data.customer.phone;
+      document.getElementById('customerEmail').value = data.customer.email;
+      document.getElementById('invoiceDate').value = data.date;
+
+      document.getElementById('invoiceBody').innerHTML = '';
+      data.items.forEach(item => addItem(item));
+    }
+
+    function newInvoice() {
+      if (!confirm('Start new invoice?')) return;
+      document.getElementById('customerName').value = '';
+      document.getElementById('customerPhone').value = '';
+      document.getElementById('customerEmail').value = '';
+      document.getElementById('invoiceDate').valueAsDate = new Date();
+      document.getElementById('invoiceBody').innerHTML = '';
+      addItem();
+      updateTotals();
+    }
+
+    window.onload = async () => {
+      await loadJSONFiles();
+      document.getElementById('invoiceDate').valueAsDate = new Date();
+      addItem();
+    };
+  </script>
+</body>
+</html>
