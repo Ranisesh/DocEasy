@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RaniDocEasy</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #fff;
+      font-size: 12px;
+      width: 280px; /* perfect for 3-inch thermal paper */
+      margin: auto;
+    }
+    .center { text-align: center; font-weight: bold; }
+    .line { display: flex; justify-content: space-between; }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 11px;
+    }
+    input, select, button {
+      font-size: 12px;
+      margin: 4px 0;
+      width: 100%;
+    }
+    hr { border: 0; border-top: 1px dashed #000; }
+  </style>
+</head>
+<body>
+  <div class="center">
+    RaniDocEasy<br>
+    Hyderabad 500035<br>
+    seshqtx@gmail.com 9440624409
+  </div>
+
+  <hr />
+
+  <label>Select Customer:</label>
+  <select id="customerSelect" onchange="fillCustomerDetails()">
+    <option value="">-- Select --</option>
+  </select>
+
+  <label>Name:</label>
+  <input type="text" id="customerName" readonly />
+  <label>Phone:</label>
+  <input type="text" id="customerPhone" readonly />
+  <label>Email:</label>
+  <input type="text" id="customerEmail" readonly />
+
+  <hr />
+
+  <label>Select Product:</label>
+  <select id="productSelect"></select>
+
+  <label>Qty:</label>
+  <input type="number" id="qty" value="1" min="1" />
+
+  <button onclick="addToInvoice()">Add to Invoice</button>
+
+  <hr />
+
+  <div id="invoiceItems"></div>
+
+  <div id="grandTotal" class="center"></div>
+
+  <div class="footer">
+    Thank you for your Purchase.<br />
+    Visit again.
+  </div>
+
+  <button onclick="window.print()">🖨️ Print Receipt</button>
+
+  <script>
+    let customers = [];
+    let products = [];
+    let invoice = [];
+
+    async function loadData() {
+      const customerRes = await fetch("customers.json");
+      customers = await customerRes.json();
+      const customerSelect = document.getElementById("customerSelect");
+      customers.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.name;
+        customerSelect.appendChild(opt);
+      });
+
+      const productRes = await fetch("products.json");
+      products = await productRes.json();
+      const productSelect = document.getElementById("productSelect");
+      products.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.name;
+        productSelect.appendChild(opt);
+      });
+    }
+
+    function fillCustomerDetails() {
+      const selectedId = document.getElementById("customerSelect").value;
+      const cust = customers.find(c => c.id == selectedId);
+      if (cust) {
+        document.getElementById("customerName").value = cust.name;
+        document.getElementById("customerPhone").value = cust.phone;
+        document.getElementById("customerEmail").value = cust.email;
+      }
+    }
+
+    function addToInvoice() {
+      const pid = document.getElementById("productSelect").value;
+      const qty = parseInt(document.getElementById("qty").value);
+      const prod = products.find(p => p.id == pid);
+      if (!prod || qty < 1) return;
+
+      invoice.push({ name: prod.name, price: prod.price, qty });
+      renderInvoice();
+    }
+
+    function renderInvoice() {
+      const div = document.getElementById("invoiceItems");
+      div.innerHTML = "";
+      let total = 0;
+      invoice.forEach(item => {
+        const line = document.createElement("div");
+        line.className = "line";
+        const lineTotal = item.price * item.qty;
+        line.innerHTML = `<span>${item.qty} x ${item.name}</span><span>₹${lineTotal}</span>`;
+        total += lineTotal;
+        div.appendChild(line);
+      });
+
+      document.getElementById("grandTotal").innerHTML = `<hr><b>Grand Total: ₹${total}</b>`;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
